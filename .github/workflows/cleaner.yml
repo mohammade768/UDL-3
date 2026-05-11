@@ -35,7 +35,6 @@ jobs:
           echo "AVASAM (https://avasam.ir) - Cleaning downloads folder"
           echo ""
 
-          # Remove everything inside downloads/ from git tracking and disk
           if [ -d "downloads" ]; then
             echo "Removing downloads folder..."
             git rm -rf downloads/ 2>/dev/null || true
@@ -44,17 +43,11 @@ jobs:
             echo "Downloads folder doesn't exist, will create it."
           fi
 
-          # Recreate the folder with a README
           mkdir -p downloads
-          cat > downloads/README.md << 'EOF'
-## empty
-for start go Action tab and use left side workflows
-EOF
+          printf '## empty\nfor start go Action tab and use left side workflows\n' > downloads/README.md
 
-          # Force add — bypasses .gitignore completely
           git add -f downloads/README.md
 
-          # Check if there's anything to commit
           if git diff --staged --quiet; then
             echo "No changes to commit."
             exit 0
@@ -75,13 +68,9 @@ EOF
               git reset --hard HEAD~1 2>/dev/null || true
               git pull --rebase origin "$BRANCH" 2>/dev/null || true
 
-              # Recreate after rebase conflict reset
               rm -rf downloads/ 2>/dev/null || true
               mkdir -p downloads
-              cat > downloads/README.md << 'EOF'
-## empty
-for start go Action tab and use left side workflows
-EOF
+              printf '## empty\nfor start go Action tab and use left side workflows\n' > downloads/README.md
               git add -f downloads/README.md
               git commit -m "[AVASAM] Clean downloads folder [skip ci]" 2>/dev/null || true
             }
