@@ -13,44 +13,109 @@ jobs:
   delete:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
-      - name: Clean downloads folder
+      - name: Configure Git
         run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+      - name: Clean and recreate downloads folder
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+
           echo "AVASAM (https://avasam.ir) - Cleaning downloads folder"
           echo ""
 
-          # Remove the entire downloads folder if it exists
+          # Remove everything inside downloads/ from git tracking and disk
           if [ -d "downloads" ]; then
-            echo "Removing all files in downloads/..."
-            rm -rf downloads/
-            echo "Downloads folder removed."
+            echo "Removing downloads folder..."
+            git rm -rf downloads/ 2>/dev/null || true
+            rm -rf downloads/ 2>/dev/null || true
           else
-            echo "Downloads folder doesn't exist yet."
+            echo "Downloads folder doesn't exist, will create it."
           fi
 
-          # Recreate the folder with a placeholder README
+          # Recreate the folder with a README
           mkdir -p downloads
+          cat > downloads/README.md << 'EOF'
+# Downloads
 
-          {
-            echo "# Downloads"
-            echo ""
-            echo "---"
-            echo ""
-            echo "## NO FILE DOWNLOADED YET!"
-            echo ""
-            echo "Use the download workflows to add files here."
-            echo ""
-            echo "---"
-            echo ""
-            echo "*This tool created by [avasam.ir](https://avasam.ir)*"
-          } > downloads/README.md
+---
 
-          echo ""
-          echo "=========================================="
-          echo "✅ Downloads folder cleared successfully!"
-          echo "AVASAM (https://avasam.ir)"
-          echo "=========================================="
+## NO FILE DOWNLOADED YET!
+
+Use the download workflows to add files here.
+
+---
+
+*This tool created by [avasam.ir](https://avasam.ir)*
+EOF
+
+          # Force add — bypasses .gitignore completely
+          git add -f downloads/README.md
+
+          # Check if there's anything to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "[AVASAM] Clean downloads folder [skip ci]"
+
+          echo "Pushing changes..."
+
+          RETRY=0
+          MAX_RETRIES=5
+          while [ $RETRY -lt $MAX_RETRIES ]; do
+            RETRY=$((RETRY + 1))
+
+            git fetch origin "$BRANCH" --quiet 2>/dev/null || true
+            git rebase origin/"$BRANCH" 2>/dev/null || {
+              git rebase --abort 2>/dev/null || true
+              git reset --hard HEAD~1 2>/dev/null || true
+              git pull --rebase origin "$BRANCH" 2>/dev/null || true
+
+              # Recreate after rebase conflict reset
+              rm -rf downloads/ 2>/dev/null || true
+              mkdir -p downloads
+              cat > downloads/README.md << 'EOF'
+# Downloads
+
+---
+
+## NO FILE DOWNLOADED YET!
+
+Use the download workflows to add files here.
+
+---
+
+*This tool created by [avasam.ir](https://avasam.ir)*
+EOF
+              git add -f downloads/README.md
+              git commit -m "[AVASAM] Clean downloads folder [skip ci]" 2>/dev/null || true
+            }
+
+            if timeout 60 git push origin HEAD:"$BRANCH" 2>&1; then
+              echo ""
+              echo "=========================================="
+              echo "✅ Downloads folder cleared successfully!"
+              echo "AVASAM (https://avasam.ir)"
+              echo "=========================================="
+              exit 0
+            else
+              echo "Push failed, retry $RETRY/$MAX_RETRIES..."
+              sleep $((2 + RANDOM % 5))
+            fi
+          done
+
+          echo "❌ Failed to push after $MAX_RETRIES attempts"
+          exit 1
