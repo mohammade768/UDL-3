@@ -1,5 +1,5 @@
 ---
-name: 🔥 01- Down load URL
+name: ⬇️  01- Down load URL
 
 on:
   workflow_dispatch:
@@ -32,6 +32,7 @@ env:
 
 jobs:
   check-activation:
+    name: "🔍 بررسی فعالسازی"
     runs-on: ubuntu-latest
     outputs:
       is_activated: ${{ steps.check.outputs.is_activated }}
@@ -46,7 +47,7 @@ jobs:
           path: .activation-status
           key: activation-status-${{ github.repository }}
 
-      - name: بررسی وضعیت کد فعالسازی
+      - name: Check activation status
         id: check
         run: |
           echo "========================================"
@@ -70,6 +71,7 @@ jobs:
           echo "========================================"
 
   activate:
+    name: "🔐 فعالسازی با کد"
     needs: check-activation
     if: needs.check-activation.outputs.is_activated == 'false' && github.event.inputs.activation_code != ''
     runs-on: ubuntu-latest
@@ -169,7 +171,7 @@ jobs:
             echo "ℹ️ راهنمای خرید قبلاً در README موجود است"
           fi
 
-      - name: بررسی کد فعالسازی
+      - name: Fail on invalid code
         if: steps.validate.outputs.valid != 'true'
         run: |
           echo ""
@@ -214,6 +216,7 @@ jobs:
           echo "========================================"
 
   not-activated:
+    name: "⚠️ نیاز به فعالسازی"
     needs: check-activation
     if: needs.check-activation.outputs.is_activated == 'false' && github.event.inputs.activation_code == ''
     runs-on: ubuntu-latest
@@ -280,6 +283,7 @@ jobs:
           exit 1
 
   save-file:
+    name: "📥 دانلود فایل"
     needs: [check-activation, activate]
     if: always() && !cancelled() && (needs.check-activation.outputs.is_activated == 'true' || needs.activate.outputs.just_activated == 'true')
     runs-on: ubuntu-latest
